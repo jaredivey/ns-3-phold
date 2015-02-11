@@ -17,18 +17,18 @@ As necessary, additional instructions for installing ns-3 may be found here:<br>
 <ol>
     <li>Download ns-3.21 (If you do not already have it.)</li>
     <li>Copy patch to ns-3.21 directory and apply patch with the following command:<br>
-        `patch -p 1 -i phold.patch`</li>
+        patch -p 1 -i phold.patch</li>
     <li>Configure ns-3 to enable MPI:<br>
-        `./waf configure -d optimized --enable-mpi`</li>
+        ./waf configure -d optimized --enable-mpi</li>
     <li>Build ns-3:<br>
-        `./waf`</li>
+        ./waf</li>
     <li>Update PATH and LD_LIBRARY_PATH:<br>
-        `export PATH=$(PATH):$(HOME)/repos/ns-3-allinone/ns-3.21/build/`<br>
-        `export LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(HOME)/repos/ns-3-allinone/ns-3.21/build/`</li>
+        export PATH=$(PATH):$(HOME)/repos/ns-3-allinone/ns-3.21/build/<br>
+        export LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(HOME)/repos/ns-3-allinone/ns-3.21/build/</li>
     <li>Build and run phold application in a separate directory:<br>
-        `make`<br>
-        `TRIALRUN="phold --simtype=0 --maxPackets=1024 --lookAhead=0.020 --remote=0.5 --groupNum=2"`<br>
-        `mpirun -np 8 $TRIALRUN`</li>
+        make<br>
+        TRIALRUN="phold --simtype=0 --maxPackets=1024 --lookAhead=0.020 --remote=0.5 --groupNum=2"<br>
+        mpirun -np 8 $TRIALRUN</li>
 </ol>
 <br>
 NOTE: The patch also contains a distributed termination detection scheme introduced by Rana:<br>
