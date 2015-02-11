@@ -1,0 +1,1483 @@
+diff -r 20e19ee60c19 src/mpi/model/distributed-simulator-impl.cc
+--- a/src/mpi/model/distributed-simulator-impl.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/distributed-simulator-impl.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -37,10 +37,10 @@
+ #include <mpi.h>
+ #endif
+ 
++namespace ns3 {
++
+ NS_LOG_COMPONENT_DEFINE ("DistributedSimulatorImpl");
+ 
+-namespace ns3 {
+-
+ NS_OBJECT_ENSURE_REGISTERED (DistributedSimulatorImpl);
+ 
+ LbtsMessage::~LbtsMessage ()
+@@ -77,6 +77,7 @@
+ }
+ 
+ Time DistributedSimulatorImpl::m_lookAhead = Seconds (-1);
++uint32_t DistributedSimulatorImpl::m_eventWnd = 0;
+ 
+ TypeId
+ DistributedSimulatorImpl::GetTypeId (void)
+@@ -171,63 +172,63 @@
+     }
+   else
+     {
+-      if (m_lookAhead == Seconds (-1))
+-        {
+-          m_lookAhead = GetMaximumSimulationTime ();
+-        }
++      //if (m_lookAhead == Seconds (-1))
++      //  {
++      //    m_lookAhead = GetMaximumSimulationTime ();
++      //  }
+       // else it was already set by SetLookAhead
+ 
+-      NodeContainer c = NodeContainer::GetGlobal ();
+-      for (NodeContainer::Iterator iter = c.Begin (); iter != c.End (); ++iter)
+-        {
+-          if ((*iter)->GetSystemId () != MpiInterface::GetSystemId ())
+-            {
+-              continue;
+-            }
++      //NodeContainer c = NodeContainer::GetGlobal ();
++      //for (NodeContainer::Iterator iter = c.Begin (); iter != c.End (); ++iter)
++      //  {
++      //    if ((*iter)->GetSystemId () != MpiInterface::GetSystemId ())
++      //      {
++      //        continue;
++      //      }
+ 
+-          for (uint32_t i = 0; i < (*iter)->GetNDevices (); ++i)
+-            {
+-              Ptr<NetDevice> localNetDevice = (*iter)->GetDevice (i);
+-              // only works for p2p links currently
+-              if (!localNetDevice->IsPointToPoint ())
+-                {
+-                  continue;
+-                }
+-              Ptr<Channel> channel = localNetDevice->GetChannel ();
+-              if (channel == 0)
+-                {
+-                  continue;
+-                }
++      //    for (uint32_t i = 0; i < (*iter)->GetNDevices (); ++i)
++      //      {
++      //        Ptr<NetDevice> localNetDevice = (*iter)->GetDevice (i);
++      //        // only works for p2p links currently
++      //        if (!localNetDevice->IsPointToPoint ())
++      //          {
++      //            continue;
++      //          }
++      //        Ptr<Channel> channel = localNetDevice->GetChannel ();
++      //        if (channel == 0)
++      //          {
++      //            continue;
++      //          }
+ 
+-              // grab the adjacent node
+-              Ptr<Node> remoteNode;
+-              if (channel->GetDevice (0) == localNetDevice)
+-                {
+-                  remoteNode = (channel->GetDevice (1))->GetNode ();
+-                }
+-              else
+-                {
+-                  remoteNode = (channel->GetDevice (0))->GetNode ();
+-                }
++      //        // grab the adjacent node
++      //        Ptr<Node> remoteNode;
++      //        if (channel->GetDevice (0) == localNetDevice)
++      //          {
++      //            remoteNode = (channel->GetDevice (1))->GetNode ();
++      //          }
++      //        else
++      //          {
++      //            remoteNode = (channel->GetDevice (0))->GetNode ();
++      //          }
+ 
+-              // if it's not remote, don't consider it
+-              if (remoteNode->GetSystemId () == MpiInterface::GetSystemId ())
+-                {
+-                  continue;
+-                }
++      //        // if it's not remote, don't consider it
++      //        if (remoteNode->GetSystemId () == MpiInterface::GetSystemId ())
++      //          {
++      //            continue;
++      //          }
+ 
+-              // compare delay on the channel with current value of
+-              // m_lookAhead.  if delay on channel is smaller, make
+-              // it the new lookAhead.
+-              TimeValue delay;
+-              channel->GetAttribute ("Delay", delay);
++      //        // compare delay on the channel with current value of
++      //        // m_lookAhead.  if delay on channel is smaller, make
++      //        // it the new lookAhead.
++      //        TimeValue delay;
++      //        channel->GetAttribute ("Delay", delay);
+ 
+-              if (delay.Get () < m_lookAhead)
+-                {
+-                  m_lookAhead = delay.Get ();
+-                }
+-            }
+-        }
++      //        if (delay.Get () < m_lookAhead)
++      //          {
++      //            m_lookAhead = delay.Get ();
++      //          }
++      //      }
++      //  }
+     }
+ 
+   // m_lookAhead is now set
+@@ -248,20 +249,20 @@
+    * per unit of simulation time in order to equalize the amount of
+    * work per time window.
+    */
+-  long sendbuf;
+-  long recvbuf;
++  //long sendbuf;
++  //long recvbuf;
+ 
+   /* Tasks with no inter-task links do not contribute to max */
+-  if (m_lookAhead == GetMaximumSimulationTime ())
+-    {
+-      sendbuf = 0;
+-    }
+-  else
+-    {
+-      sendbuf  = m_lookAhead.GetInteger ();
+-    }
++  //if (m_lookAhead == GetMaximumSimulationTime ())
++  //  {
++  //    sendbuf = 0;
++  //  }
++  //else
++  //  {
++  //    sendbuf  = m_lookAhead.GetInteger ();
++  //  }
+ 
+-  MPI_Allreduce (&sendbuf, &recvbuf, 1, MPI_LONG, MPI_MAX, MPI_COMM_WORLD);
++  //MPI_Allreduce (&sendbuf, &recvbuf, 1, MPI_LONG, MPI_MAX, MPI_COMM_WORLD);
+ 
+   /* For nodes that did not compute a lookahead use max from ranks
+    * that did compute a value.  An edge case occurs if all nodes have
+@@ -269,11 +270,11 @@
+    * will proceed without synchronization until a single AllGather
+    * occurs when all tasks have finished.
+    */
+-  if (m_lookAhead == GetMaximumSimulationTime () && recvbuf != 0)
+-    {
+-      m_lookAhead = Time (recvbuf);
+-      m_grantedTime = m_lookAhead;
+-    }
++  //if (m_lookAhead == GetMaximumSimulationTime () && recvbuf != 0)
++  //  {
++  //    m_lookAhead = Time (recvbuf);
++  //    m_grantedTime = m_lookAhead;
++  //  }
+ 
+ #else
+   NS_FATAL_ERROR ("Can't use distributed simulator without MPI compiled in");
+@@ -381,6 +382,7 @@
+       // is finished then continue to participate in allgather
+       // synchronizations with other tasks until all tasks have
+       // completed.
++      GrantedTimeWindowMpiInterface::ReceiveMessages ();
+       if (nextTime > m_grantedTime || IsLocalFinished () )
+         {
+           // Can't process next event, calculate a new LBTS
+@@ -391,7 +393,7 @@
+           // And check for send completes
+           GrantedTimeWindowMpiInterface::TestSendComplete ();
+           // Finally calculate the lbts
+-          LbtsMessage lMsg (GrantedTimeWindowMpiInterface::GetRxCount (), GrantedTimeWindowMpiInterface::GetTxCount (), 
++          LbtsMessage lMsg (MpiInterface::GetRxCount (), MpiInterface::GetTxCount (), 
+                             m_myId, IsLocalFinished (), nextTime);
+           m_pLBTS[m_myId] = lMsg;
+           MPI_Allgather (&lMsg, sizeof (LbtsMessage), MPI_BYTE, m_pLBTS,
+@@ -427,6 +429,7 @@
+                 {
+                   // Overflow is possible here if near end of representable time.
+                   m_grantedTime = smallestTime + m_lookAhead;
++                  DistributedSimulatorImpl::m_eventWnd++;
+                 }
+             }
+         }
+diff -r 20e19ee60c19 src/mpi/model/distributed-simulator-impl.h
+--- a/src/mpi/model/distributed-simulator-impl.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/distributed-simulator-impl.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -127,6 +127,9 @@
+   virtual uint32_t GetSystemId (void) const;
+   virtual uint32_t GetContext (void) const;
+ 
++  static Time  m_lookAhead;   // Lookahead value
++  static uint32_t m_eventWnd;
++
+ private:
+   virtual void DoDispose (void);
+   void CalculateLookAhead (void);
+@@ -153,7 +156,6 @@
+   uint32_t     m_myId;        // MPI Rank
+   uint32_t     m_systemCount; // MPI Size
+   Time         m_grantedTime; // Last LBTS
+-  static Time  m_lookAhead;   // Lookahead value
+ 
+ };
+ 
+diff -r 20e19ee60c19 src/mpi/model/granted-time-window-mpi-interface.cc
+--- a/src/mpi/model/granted-time-window-mpi-interface.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/granted-time-window-mpi-interface.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -24,6 +24,7 @@
+ #include <iomanip>
+ #include <list>
+ 
++#include "distributed-simulator-impl.h"
+ #include "granted-time-window-mpi-interface.h"
+ #include "mpi-receiver.h"
+ #include "mpi-interface.h"
+@@ -44,7 +45,6 @@
+ 
+ NS_LOG_COMPONENT_DEFINE ("GrantedTimeWindowMpiInterface");
+ 
+-
+ SentBuffer::SentBuffer ()
+ {
+   m_buffer = 0;
+@@ -127,6 +127,30 @@
+   return m_txCount;
+ }
+ 
++void
++GrantedTimeWindowMpiInterface::RegRx ()
++{
++  m_rxCount++;
++}
++
++void
++GrantedTimeWindowMpiInterface::RegTx ()
++{
++  m_txCount++;
++}
++
++void
++GrantedTimeWindowMpiInterface::SetDelay (Time delay) 
++{
++  DistributedSimulatorImpl::m_lookAhead = delay;
++}
++
++Time
++GrantedTimeWindowMpiInterface::GetDelay () 
++{
++  return DistributedSimulatorImpl::m_lookAhead;
++}
++
+ uint32_t
+ GrantedTimeWindowMpiInterface::GetSystemId ()
+ {
+@@ -216,13 +240,50 @@
+ 
+   MPI_Isend (reinterpret_cast<void *> (i->GetBuffer ()), serializedSize + 16, MPI_CHAR, nodeSysId,
+              0, MPI_COMM_WORLD, (i->GetRequest ()));
+-  m_txCount++;
++  ++m_txCount;
+ #else
+   NS_FATAL_ERROR ("Can't use distributed simulator without MPI compiled in");
+ #endif
+ }
+ 
+ void
++GrantedTimeWindowMpiInterface::SendLocal (Ptr<Packet> p, const Time& rxTime)
++{
++  NS_LOG_FUNCTION (this << p << rxTime.GetTimeStep ());
++
++#ifdef NS3_MPI
++
++  Ptr<Node> pNode = NodeList::GetNode (m_sid);
++  Ptr<MpiReceiver> pMpiRec = 0;
++  uint32_t nDevices = pNode->GetNDevices ();
++  if (nDevices == 0)
++    {
++      pMpiRec = pNode->GetObject<MpiReceiver> ();
++    }
++
++  uint32_t serializedSize = p->GetSerializedSize ();
++  uint8_t* buffer =  new uint8_t[serializedSize + 16];
++  // Add the time, dest node and dest device
++  uint64_t t = rxTime.GetInteger ();
++  uint64_t* pTime = reinterpret_cast <uint64_t *> (buffer);
++  *pTime++ = t;
++  uint32_t* pData = reinterpret_cast<uint32_t *> (pTime);
++  *pData++ = m_sid;
++  *pData++ = 0;
++  // Serialize the packet
++  p->Serialize (reinterpret_cast<uint8_t *> (pData), serializedSize);
++
++  NS_ASSERT (pNode && pMpiRec);
++
++  //std::cout << Simulator::Now().GetSeconds() << " Node " << m_sid << " to " << m_sid << " #" << m_txCount << std::endl;
++  Simulator::ScheduleWithContext (m_sid, rxTime - Simulator::Now(), &MpiReceiver::Receive, pMpiRec, p);
++  ++m_rxCount;
++  ++m_txCount;
++
++#endif
++}
++
++void
+ GrantedTimeWindowMpiInterface::ReceiveMessages ()
+ { 
+   NS_LOG_FUNCTION_NOARGS ();
+@@ -242,7 +303,7 @@
+         }
+       int count;
+       MPI_Get_count (&status, MPI_CHAR, &count);
+-      m_rxCount++; // Count this receive
++      ++m_rxCount; // Count this receive
+ 
+       // Get the meta data first
+       uint64_t* pTime = reinterpret_cast<uint64_t *> (m_pRxBuffers[index]);
+@@ -261,15 +322,22 @@
+       Ptr<Node> pNode = NodeList::GetNode (node);
+       Ptr<MpiReceiver> pMpiRec = 0;
+       uint32_t nDevices = pNode->GetNDevices ();
+-      for (uint32_t i = 0; i < nDevices; ++i)
+-        {
+-          Ptr<NetDevice> pThisDev = pNode->GetDevice (i);
+-          if (pThisDev->GetIfIndex () == dev)
+-            {
+-              pMpiRec = pThisDev->GetObject<MpiReceiver> ();
+-              break;
+-            }
+-        }
++      if (nDevices != 0)
++      {
++        for (uint32_t i = 0; i < nDevices; ++i)
++          {
++            Ptr<NetDevice> pThisDev = pNode->GetDevice (i);
++            if (pThisDev->GetIfIndex () == dev)
++              {
++                pMpiRec = pThisDev->GetObject<MpiReceiver> ();
++                break;
++              }
++          }
++      }
++      else
++      {
++        pMpiRec = pNode->GetObject<MpiReceiver> ();
++      }
+ 
+       NS_ASSERT (pNode && pMpiRec);
+ 
+diff -r 20e19ee60c19 src/mpi/model/granted-time-window-mpi-interface.h
+--- a/src/mpi/model/granted-time-window-mpi-interface.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/granted-time-window-mpi-interface.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -131,6 +131,7 @@
+    * Serialize and send a packet to the specified node and net device
+    */
+   virtual void SendPacket (Ptr<Packet> p, const Time &rxTime, uint32_t node, uint32_t dev);
++  virtual void SendLocal (Ptr<Packet> p, const Time &rxTime);
+   /**
+    * Check for received messages complete
+    */
+@@ -139,14 +140,14 @@
+    * Check for completed sends
+    */
+   static void TestSendComplete ();
+-  /**
+-   * \return received count in packets
+-   */
+-  static uint32_t GetRxCount ();
+-  /**
+-   * \return transmitted count in packets
+-   */
+-  static uint32_t GetTxCount ();
++
++  virtual uint32_t GetRxCount (void);
++  virtual uint32_t GetTxCount (void);
++  virtual void RegRx (void);
++  virtual void RegTx (void);
++
++  virtual void SetDelay (Time delay);
++  virtual Time GetDelay (void);
+ 
+ private:
+   static uint32_t m_sid;
+diff -r 20e19ee60c19 src/mpi/model/mpi-interface.cc
+--- a/src/mpi/model/mpi-interface.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/mpi-interface.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -28,10 +28,10 @@
+ #include "null-message-mpi-interface.h"
+ #include "granted-time-window-mpi-interface.h"
+ 
++namespace ns3 {
++
+ NS_LOG_COMPONENT_DEFINE ("MpiInterface");
+ 
+-namespace ns3 {
+-
+ ParallelCommunicationInterface* MpiInterface::g_parallelCommunicationInterface = 0;
+ 
+ void
+@@ -42,6 +42,58 @@
+ }
+ 
+ uint32_t
++MpiInterface::GetRxCount ()
++{
++  if ( g_parallelCommunicationInterface )
++    return g_parallelCommunicationInterface->GetRxCount ();
++  else
++    return 0;
++}
++
++uint32_t
++MpiInterface::GetTxCount ()
++{
++  if ( g_parallelCommunicationInterface )
++    return g_parallelCommunicationInterface->GetTxCount ();
++  else
++    return 0;
++}
++
++void
++MpiInterface::RegRx ()
++{
++  if ( g_parallelCommunicationInterface )
++    {
++      g_parallelCommunicationInterface->RegRx ();
++    }
++}
++
++void
++MpiInterface::RegTx ()
++{
++  if ( g_parallelCommunicationInterface )
++    {
++      g_parallelCommunicationInterface->RegTx ();
++    }
++}
++
++void
++MpiInterface::SetDelay (Time delay)
++{
++  if ( g_parallelCommunicationInterface )
++    g_parallelCommunicationInterface->SetDelay(delay);
++}
++
++Time
++MpiInterface::GetDelay ()
++{
++  if ( g_parallelCommunicationInterface )
++    return g_parallelCommunicationInterface->GetDelay ();
++  else
++    return Seconds(0.0);
++}
++
++uint32_t
+ MpiInterface::GetSystemId ()
+ {
+   if ( g_parallelCommunicationInterface )
+@@ -115,6 +167,12 @@
+   g_parallelCommunicationInterface->SendPacket (p, rxTime, node, dev);
+ }
+ 
++void
++MpiInterface::SendLocal (Ptr<Packet> p, const Time& rxTime)
++{
++  NS_ASSERT (g_parallelCommunicationInterface);
++  g_parallelCommunicationInterface->SendLocal (p, rxTime);
++}
+ 
+ void
+ MpiInterface::Disable ()
+diff -r 20e19ee60c19 src/mpi/model/mpi-interface.h
+--- a/src/mpi/model/mpi-interface.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/mpi-interface.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -94,6 +94,16 @@
+    * Serialize and send a packet to the specified node and net device
+    */
+   static void SendPacket (Ptr<Packet> p, const Time &rxTime, uint32_t node, uint32_t dev);
++  static void SendLocal (Ptr<Packet> p, const Time &rxTime);
++
++  static uint32_t GetRxCount (void);
++  static uint32_t GetTxCount (void);
++
++  static void RegRx (void);
++  static void RegTx (void);
++
++  static void SetDelay (Time delay);
++  static Time GetDelay (void);
+ private:
+ 
+   /**
+diff -r 20e19ee60c19 src/mpi/model/mpi-receiver.cc
+--- a/src/mpi/model/mpi-receiver.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/mpi-receiver.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -40,16 +40,27 @@
+ }
+ 
+ void
++MpiReceiver::SetReceiveCallback1 (Callback<void, Ptr<Packet>, uint32_t > callback)
++{
++  m_rxCallback1 = callback;
++}
++
++void
+ MpiReceiver::Receive (Ptr<Packet> p)
+ {
+-  NS_ASSERT (!m_rxCallback.IsNull ());
+-  m_rxCallback (p);
++  //NS_ASSERT (!m_rxCallback.IsNull ());
++  //m_rxCallback (p);
++  if (!m_rxCallback.IsNull())
++    m_rxCallback (p);
++  else
++    m_rxCallback1 (p, 0);
+ }
+ 
+ void
+ MpiReceiver::DoDispose(void)
+ {
+   m_rxCallback = MakeNullCallback<void, Ptr<Packet> >();
++  m_rxCallback1 = MakeNullCallback<void, Ptr<Packet>, uint32_t >();
+ }
+ 
+ } // namespace ns3
+diff -r 20e19ee60c19 src/mpi/model/mpi-receiver.h
+--- a/src/mpi/model/mpi-receiver.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/mpi-receiver.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -55,10 +55,12 @@
+    * \param callback the callback itself
+    */
+   void SetReceiveCallback (Callback<void, Ptr<Packet> > callback);
++  void SetReceiveCallback1 (Callback<void, Ptr<Packet>, uint32_t > callback);
+ private:
+   virtual void DoDispose (void);
+ 
+   Callback<void, Ptr<Packet> > m_rxCallback;
++  Callback<void, Ptr<Packet>, uint32_t> m_rxCallback1;
+ };
+ 
+ } // namespace ns3
+diff -r 20e19ee60c19 src/mpi/model/null-message-mpi-interface.cc
+--- a/src/mpi/model/null-message-mpi-interface.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/null-message-mpi-interface.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -41,10 +41,10 @@
+ #include <iomanip>
+ #include <list>
+ 
++namespace ns3 {
++
+ NS_LOG_COMPONENT_DEFINE ("NullMessageMpiInterface");
+ 
+-namespace ns3 {
+-
+ /**
+  * maximum MPI message size for easy
+  * buffer creation
+@@ -87,6 +87,8 @@
+ uint32_t              NullMessageMpiInterface::g_numNeighbors = 0;
+ bool                  NullMessageMpiInterface::g_initialized = false;
+ bool                  NullMessageMpiInterface::g_enabled = false;
++uint32_t              NullMessageMpiInterface::m_rxCount = 0;
++uint32_t              NullMessageMpiInterface::m_txCount = 0;
+ std::list<NullMessageSentBuffer> NullMessageMpiInterface::g_pendingTx;
+ 
+ MPI_Request* NullMessageMpiInterface::g_requests;
+@@ -117,6 +119,42 @@
+ }
+ 
+ uint32_t
++NullMessageMpiInterface::GetRxCount ()
++{
++  return m_rxCount;
++}
++
++uint32_t
++NullMessageMpiInterface::GetTxCount ()
++{
++  return m_txCount;
++}
++
++void
++NullMessageMpiInterface::RegRx ()
++{
++  m_rxCount++;
++}
++
++void
++NullMessageMpiInterface::RegTx ()
++{
++  m_txCount++;
++}
++
++void
++NullMessageMpiInterface::SetDelay (Time delay) 
++{
++  RemoteChannelBundle::SetDelay (delay);
++}
++
++Time
++NullMessageMpiInterface::GetDelay () 
++{
++  return RemoteChannelBundle::GetDelayStatic ();
++}
++
++uint32_t
+ NullMessageMpiInterface::GetSystemId ()
+ {
+   NS_ASSERT (g_enabled);
+@@ -230,6 +268,7 @@
+ 
+   MPI_Isend (reinterpret_cast<void *> (iter->GetBuffer ()), bufferSize, MPI_CHAR, nodeSysId,
+              0, MPI_COMM_WORLD, (iter->GetRequest ()));
++  ++m_txCount;
+ 
+   NullMessageSimulatorImpl::GetInstance ()->RescheduleNullMessageEvent (nodeSysId);
+ 
+@@ -237,6 +276,50 @@
+ }
+ 
+ void
++NullMessageMpiInterface::SendLocal (Ptr<Packet> p, const Time& rxTime)
++{
++  NS_LOG_FUNCTION (this << p << rxTime.GetTimeStep ());
++
++  NS_ASSERT (g_enabled);
++
++#ifdef NS3_MPI
++
++  Ptr<Node> pNode = NodeList::GetNode (g_sid);
++  Ptr<MpiReceiver> pMpiRec = 0;
++  uint32_t nDevices = pNode->GetNDevices ();
++  if (nDevices == 0)
++    {
++      pMpiRec = pNode->GetObject<MpiReceiver> ();
++    }
++
++  uint32_t serializedSize = p->GetSerializedSize ();
++  uint32_t bufferSize = serializedSize + ( 2 * sizeof (uint64_t) ) + ( 2 * sizeof (uint32_t) );
++  uint8_t* buffer =  new uint8_t[bufferSize];
++  // Add the time, dest node and dest device
++  uint64_t t = rxTime.GetInteger ();
++  uint64_t* pTime = reinterpret_cast <uint64_t *> (buffer);
++  *pTime++ = t;
++
++  Time guarantee_update = Seconds(0);
++  *pTime++ = guarantee_update.GetTimeStep ();
++
++  uint32_t* pData = reinterpret_cast<uint32_t *> (pTime);
++  *pData++ = g_sid;
++  *pData++ = 0;
++  // Serialize the packet
++  p->Serialize (reinterpret_cast<uint8_t *> (pData), serializedSize);
++
++  NS_ASSERT (pNode && pMpiRec);
++
++  //std::cout << Simulator::Now().GetSeconds() << " Node " << g_sid << " to " << g_sid << " #" << m_txCount << std::endl;
++  Simulator::ScheduleWithContext (g_sid, rxTime - Simulator::Now(), &MpiReceiver::Receive, pMpiRec, p);
++  ++m_rxCount;
++  ++m_txCount;
++
++#endif
++}
++
++void
+ NullMessageMpiInterface::SendNullMessage (const Time& guarantee_update, Ptr<RemoteChannelBundle> bundle)
+ {
+   NS_LOG_FUNCTION (guarantee_update.GetTimeStep () << bundle);
+@@ -349,33 +432,41 @@
+               Ptr<Node> pNode = NodeList::GetNode (node);
+               Ptr<MpiReceiver> pMpiRec = 0;
+               uint32_t nDevices = pNode->GetNDevices ();
+-              for (uint32_t i = 0; i < nDevices; ++i)
++              if (nDevices != 0)
+                 {
+-                  Ptr<NetDevice> pThisDev = pNode->GetDevice (i);
+-                  if (pThisDev->GetIfIndex () == dev)
++                  for (uint32_t i = 0; i < nDevices; ++i)
+                     {
+-                      pMpiRec = pThisDev->GetObject<MpiReceiver> ();
+-                      break;
++                      Ptr<NetDevice> pThisDev = pNode->GetDevice (i);
++                      if (pThisDev->GetIfIndex () == dev)
++                        {
++                          pMpiRec = pThisDev->GetObject<MpiReceiver> ();
++                          break;
++                        }
+                     }
+                 }
++              else
++                {
++                  pMpiRec = pNode->GetObject<MpiReceiver> ();
++                }
+               NS_ASSERT (pNode && pMpiRec);
+ 
+               // Schedule the rx event
+               Simulator::ScheduleWithContext (pNode->GetId (), rxTime - Simulator::Now (),
+                                               &MpiReceiver::Receive, pMpiRec, p);
+-
++              ++m_rxCount;
+             }
+ 
+           // Update guarantee time for both packet receives and Null Messages.
+           Ptr<RemoteChannelBundle> bundle = RemoteChannelBundleManager::Find (status.MPI_SOURCE);
+           NS_ASSERT (bundle);
+ 
++          //std::cout << Simulator::Now().GetMilliSeconds() << " Rank: " << g_sid << " Guarantee Time updated to : " << Time(guaranteeUpdate).GetMilliSeconds() << std::endl;
++
+           bundle->SetGuaranteeTime (Time (guaranteeUpdate));
+ 
+           // Re-queue the next read
+           MPI_Irecv (g_pRxBuffers[index], NULL_MESSAGE_MAX_MPI_MSG_SIZE, MPI_CHAR, status.MPI_SOURCE, 0,
+                      MPI_COMM_WORLD, &g_requests[index]);
+-
+         }
+       else
+         {
+diff -r 20e19ee60c19 src/mpi/model/null-message-mpi-interface.h
+--- a/src/mpi/model/null-message-mpi-interface.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/null-message-mpi-interface.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -140,6 +140,7 @@
+    * uint8_t[] serialized packet
+    */
+   virtual void SendPacket (Ptr<Packet> p, const Time &rxTime, uint32_t node, uint32_t dev);
++  virtual void SendLocal (Ptr<Packet> p, const Time &rxTime);
+   /**
+    * \param guaranteeUpdate guarantee update time for the Null Message
+    * \bundle the destination bundle for the Null Message.
+@@ -188,8 +189,15 @@
+    */
+   static void InitializeSendReceiveBuffers (void);
+ 
++  virtual uint32_t GetRxCount (void);
++  virtual uint32_t GetTxCount (void);
++  virtual void RegRx (void);
++  virtual void RegTx (void);
++
++  virtual void SetDelay (Time delay);
++  virtual Time GetDelay (void);
++
+ private:
+-
+   /**
+    * Check for received messages complete.  Will block until message
+    * has been received if blocking flag is true.  When blocking will
+@@ -205,6 +213,12 @@
+   // Size of the MPI COM_WORLD group.
+   static uint32_t g_size;
+ 
++  // Total packets received
++  static uint32_t m_rxCount;
++
++  // Total packets sent
++  static uint32_t m_txCount;
++
+   // Number of neighbor tasks, tasks that this task shares a link with.
+   static uint32_t g_numNeighbors;
+ 
+diff -r 20e19ee60c19 src/mpi/model/null-message-simulator-impl.cc
+--- a/src/mpi/model/null-message-simulator-impl.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/null-message-simulator-impl.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -32,6 +32,7 @@
+ #include <ns3/channel.h>
+ #include <ns3/node-container.h>
+ #include <ns3/double.h>
++#include "ns3/uinteger.h"
+ #include <ns3/ptr.h>
+ #include <ns3/pointer.h>
+ #include <ns3/assert.h>
+@@ -42,14 +43,18 @@
+ #include <fstream>
+ #include <iomanip>
+ 
++namespace ns3 {
++
+ NS_LOG_COMPONENT_DEFINE ("NullMessageSimulatorImpl");
+ 
+-namespace ns3 {
+-
+ NS_OBJECT_ENSURE_REGISTERED (NullMessageSimulatorImpl);
+ 
+ NullMessageSimulatorImpl* NullMessageSimulatorImpl::g_instance = 0;
+ 
++#define ACTIVE    0
++#define PASSIVE   1
++#define TERMINATE 2
++
+ TypeId
+ NullMessageSimulatorImpl::GetTypeId (void)
+ {
+@@ -60,6 +65,10 @@
+                    DoubleValue (1.0),
+                    MakeDoubleAccessor (&NullMessageSimulatorImpl::m_schedulerTune),
+                    MakeDoubleChecker<double> (0.01,1.0))
++    .AddAttribute ("GroupNumber", "The number of LPs to which an LP may transmit messages",
++                   UintegerValue (1),
++                   MakeUintegerAccessor (&NullMessageSimulatorImpl::m_numGroups),
++                   MakeUintegerChecker<uint32_t> ())
+   ;
+   return tid;
+ }
+@@ -87,6 +96,17 @@
+ 
+   m_safeTime = Seconds (0);
+ 
++  m_stopScheduled = false;
++  m_actType = ACTIVE;
++  m_lastActiveTimeLocal = 0;
++  m_lastActiveTimeRemote = 0;
++  m_stopRequests = new MPI_Request[m_systemCount - 1];
++  m_initPsv = false;
++  m_fwdPsv = false;
++  m_stopSent = false;
++
++  m_numMessages = 0;
++
+   NS_ASSERT (g_instance == 0);
+   g_instance = this;
+ 
+@@ -139,64 +159,131 @@
+ {
+   NS_LOG_FUNCTION (this);
+ 
+-  int num_local_nodes = 0;
++  //int num_local_nodes = 0;
+ 
+   if (MpiInterface::GetSize () > 1)
+     {
+       NodeContainer c = NodeContainer::GetGlobal ();
++
++      uint32_t lowerNode;
++      uint32_t upperNode;
++      int nodeDiff = (int)(MpiInterface::GetSystemId()) - (int)(m_numGroups);
++      if (nodeDiff < 0)
++        {
++          lowerNode = MpiInterface::GetSystemId () + m_systemCount - m_numGroups;
++        }
++      else
++        {
++          lowerNode = MpiInterface::GetSystemId () - m_numGroups;
++        }
++
++      if (MpiInterface::GetSystemId () + m_numGroups < m_systemCount)
++        {
++          upperNode = MpiInterface::GetSystemId () + m_numGroups;
++        }
++      else
++        {
++          upperNode = MpiInterface::GetSystemId () + m_numGroups - m_systemCount;
++        }
++
+       for (NodeContainer::Iterator iter = c.Begin (); iter != c.End (); ++iter)
+-        {
+-          if ((*iter)->GetSystemId () != MpiInterface::GetSystemId ())
++        { 
++          if (
++               (
++                 ((*iter)->GetSystemId () >= lowerNode) && 
++                 ((*iter)->GetSystemId () <= upperNode) && 
++                 (lowerNode < upperNode) 
++               )
++               ||
++               ( 
++                 ( 
++                   ((*iter)->GetSystemId () >= lowerNode) && 
++                   ((*iter)->GetSystemId () <= upperNode + m_systemCount) &&
++                   (lowerNode >= upperNode)
++                 ) 
++                 ||
++                 (
++                   ((*iter)->GetSystemId () + m_systemCount >= lowerNode) && 
++                   ((*iter)->GetSystemId () <= upperNode) && 
++                   (lowerNode >= upperNode)
++                 ) 
++                 ||
++                 (
++                   ((*iter)->GetSystemId () >= lowerNode) && 
++                   ((*iter)->GetSystemId () <= upperNode) && 
++                   (lowerNode >= upperNode)
++                 )
++               )
++             )
+             {
+-              continue;
+-            }
+-
+-          num_local_nodes++;
+-
+-          for (uint32_t i = 0; i < (*iter)->GetNDevices (); ++i)
+-            {
+-              Ptr<NetDevice> localNetDevice = (*iter)->GetDevice (i);
+-              // only works for p2p links currently
+-              if (!localNetDevice->IsPointToPoint ())
+-                {
+-                  continue;
+-                }
+-              Ptr<Channel> channel = localNetDevice->GetChannel ();
+-              if (channel == 0)
++              if ((*iter)->GetSystemId () == MpiInterface::GetSystemId ())
+                 {
+                   continue;
+                 }
+ 
+-              // grab the adjacent node
+-              Ptr<Node> remoteNode;
+-              if (channel->GetDevice (0) == localNetDevice)
+-                {
+-                  remoteNode = (channel->GetDevice (1))->GetNode ();
+-                }
+-              else
+-                {
+-                  remoteNode = (channel->GetDevice (0))->GetNode ();
+-                }
+-
+-              // if it's not remote, don't consider it
+-              if (remoteNode->GetSystemId () == MpiInterface::GetSystemId ())
+-                {
+-                  continue;
+-                }
++//std::cout << "Neighbor " << (*iter)->GetSystemId () << " for " << m_myId << std::endl;
+ 
+               /**
+-               * Add this channel to the remote channel bundle from this task to MPI task on other side of the channel.
+-               */
+-              Ptr<RemoteChannelBundle> remoteChannelBundle = RemoteChannelBundleManager::Find (remoteNode->GetSystemId ());
++                * Add this channel to the remote channel bundle from this task to MPI task on other side of the channel.
++                */
++              Ptr<RemoteChannelBundle> remoteChannelBundle = RemoteChannelBundleManager::Find ((*iter)->GetSystemId ());
+               if (!remoteChannelBundle)
+                 {
+-                  remoteChannelBundle = RemoteChannelBundleManager::Add (remoteNode->GetSystemId ());
++                  remoteChannelBundle = RemoteChannelBundleManager::Add ((*iter)->GetSystemId ());
+                 }
++            }
+ 
+-              TimeValue delay;
+-              channel->GetAttribute ("Delay", delay);
+-              remoteChannelBundle->AddChannel (channel, delay.Get () );
+-            }
++          //if ((*iter)->GetSystemId () != MpiInterface::GetSystemId ())
++          //  {
++          //    continue;
++          //  }
++
++          //num_local_nodes++;
++
++          //for (uint32_t i = 0; i < (*iter)->GetNDevices (); ++i)
++          //  {
++          //    Ptr<NetDevice> localNetDevice = (*iter)->GetDevice (i);
++          //    // only works for p2p links currently
++          //    if (!localNetDevice->IsPointToPoint ())
++          //      {
++          //        continue;
++          //      }
++          //    Ptr<Channel> channel = localNetDevice->GetChannel ();
++          //    if (channel == 0)
++          //      {
++          //        continue;
++          //      }
++
++          //    // grab the adjacent node
++          //    Ptr<Node> remoteNode;
++          //    if (channel->GetDevice (0) == localNetDevice)
++          //      {
++          //        remoteNode = (channel->GetDevice (1))->GetNode ();
++          //      }
++          //    else
++          //      {
++          //        remoteNode = (channel->GetDevice (0))->GetNode ();
++          //      }
++
++          //    // if it's not remote, don't consider it
++          //    if (remoteNode->GetSystemId () == MpiInterface::GetSystemId ())
++          //      {
++          //        continue;
++          //      }
++
++          //    /**
++          //     * Add this channel to the remote channel bundle from this task to MPI task on other side of the channel.
++          //     */
++          //    Ptr<RemoteChannelBundle> remoteChannelBundle = RemoteChannelBundleManager::Find (remoteNode->GetSystemId ());
++          //    if (!remoteChannelBundle)
++          //      {
++          //        remoteChannelBundle = RemoteChannelBundleManager::Add (remoteNode->GetSystemId ());
++          //      }
++
++          //    TimeValue delay;
++          //    channel->GetAttribute ("Delay", delay);
++          //    remoteChannelBundle->AddChannel (channel, delay.Get () );
++          //  }
+         }
+     }
+ 
+@@ -237,6 +324,7 @@
+ 
+   NS_LOG_LOGIC ("handle " << next.key.m_ts);
+   m_currentTs = next.key.m_ts;
++  //std::cout << "Rank: " << m_myId << " Time: " << Simulator::Now().GetMilliSeconds() << std::endl;
+   m_currentContext = next.key.m_context;
+   m_currentUid = next.key.m_uid;
+   next.impl->Invoke ();
+@@ -254,10 +342,14 @@
+ {
+   NS_LOG_FUNCTION (this);
+ 
+-  NS_ASSERT (!m_events->IsEmpty ());
++  //NS_ASSERT (!m_events->IsEmpty ());
+ 
+-  Scheduler::Event ev = m_events->PeekNext ();
+-  return TimeStep (ev.key.m_ts);
++  if (!m_events->IsEmpty ())
++    {
++      Scheduler::Event ev = m_events->PeekNext ();
++      return TimeStep (ev.key.m_ts);
++    }
++  return GetMaximumSimulationTime ();
+ }
+ 
+ void
+@@ -300,6 +392,21 @@
+ {
+   NS_LOG_FUNCTION (this);
+ 
++  MPI_Request psvRcvRequest, stopRequest;
++  int psvFlag = 0;
++  int stopFlag = 0;
++  MPI_Status status;
++  PASSIVATOR psvRcv;
++  uint32_t tryStop = false;
++
++  if (!m_stopScheduled)
++    {
++      MPI_Irecv (&psvRcv, sizeof(PASSIVATOR), MPI_CHAR, MPI_ANY_SOURCE, PASSIVE,
++                 MPI_COMM_WORLD, &psvRcvRequest);
++      MPI_Irecv (&tryStop, 1, MPI_UNSIGNED, MPI_ANY_SOURCE, TERMINATE,
++                 MPI_COMM_WORLD, &stopRequest);
++    }
++
+   CalculateLookAhead ();
+ 
+   RemoteChannelBundleManager::InitializeNullMessageEvents ();
+@@ -310,17 +417,87 @@
+     {
+       Time nextTime = Next ();
+ 
++      //if ( (nextTime > GetSafeTime ()) && 
++      //     (NullMessageSimulatorImpl::GetInstance ()->m_unscheduledEvents > 
++      //      (int)RemoteChannelBundleManager::Size ()) )
++      //  {
++      //    HandleArrivingMessagesBlocking ();
++      //  }
++      //else
++      //  {
++          // Block until packet or Null Message has been received.
++          HandleArrivingMessagesNonBlocking ();
++      //  }
++
+       if ( nextTime <= GetSafeTime () )
+         {
+           ProcessOneEvent ();
+-          HandleArrivingMessagesNonBlocking ();
+         }
+-      else
++
++      if (!m_stopScheduled)
+         {
+-          // Block until packet or Null Message has been received.
+-          HandleArrivingMessagesBlocking ();
++          MPI_Test (&psvRcvRequest, &psvFlag, &status);
++          MPI_Test (&stopRequest, &stopFlag, &status);
++
++          // LP was active but has become passive. Send passive message to next LP.
++          if ( (m_actType == ACTIVE) && 
++               (NullMessageSimulatorImpl::GetInstance ()->m_unscheduledEvents <=
++               (int)RemoteChannelBundleManager::Size ()) )
++            {
++              SendPassiveNotification ();
++            }
++
++          if ( psvFlag )
++            {
++              tryStop = TerminationCheck (psvRcv);
++
++              // Requeue in case another message is received.
++              MPI_Irecv (&psvRcv, sizeof(PASSIVATOR), MPI_CHAR, MPI_ANY_SOURCE,
++                         PASSIVE, MPI_COMM_WORLD, &psvRcvRequest);
++            }
++
++          if ( stopFlag || tryStop )
++            {
++              if ( tryStop )
++                {
++                  tryStop = GlobalCheckAndStop ();
++                }
++              MPI_Irecv (&tryStop, 1, MPI_UNSIGNED, MPI_ANY_SOURCE, TERMINATE,
++                         MPI_COMM_WORLD, &stopRequest);
++            }
+         }
+     }
++
++  if (!m_stopScheduled)
++    {
++      if (!psvFlag)
++        {
++          MPI_Cancel (&psvRcvRequest);
++          MPI_Request_free (&psvRcvRequest);
++        }
++
++      if (!stopFlag)
++        {
++          MPI_Cancel (&stopRequest);
++          MPI_Request_free (&stopRequest);
++        }
++
++      if (m_stopSent)
++        {
++          for (uint32_t i = 0; i < m_systemCount - 1; ++i)
++            {
++              int sndFlag = 0;
++              MPI_Status status;
++              MPI_Test (&m_stopRequests[i], &sndFlag, &status);
++              if (!sndFlag)
++                {
++                  MPI_Cancel (&m_stopRequests[i]);
++                  MPI_Request_free (&m_stopRequests[i]);
++                }
++            }
++        }
++    }
++  delete [] m_stopRequests;
+ }
+ 
+ void
+@@ -393,6 +570,7 @@
+   NS_LOG_FUNCTION (this << time.GetTimeStep ());
+ 
+   Simulator::Schedule (time, &Simulator::Stop);
++  m_stopScheduled = true;
+ }
+ 
+ //
+@@ -577,9 +755,11 @@
+ Time NullMessageSimulatorImpl::CalculateGuaranteeTime (uint32_t nodeSysId)
+ {
+   Ptr<RemoteChannelBundle> bundle = RemoteChannelBundleManager::Find (nodeSysId);
+-  NS_ASSERT (bundle);
+ 
+-  return Min (NullMessageSimulatorImpl::GetInstance ()->Next (), GetSafeTime ()) + bundle->GetDelay ();
++  if (bundle)
++    return Min (NullMessageSimulatorImpl::GetInstance ()->Next (), GetSafeTime ()) + bundle->GetDelay ();
++  else
++    return Min (NullMessageSimulatorImpl::GetInstance ()->Next (), GetSafeTime ());
+ }
+ 
+ void NullMessageSimulatorImpl::NullMessageEventHandler(RemoteChannelBundle* bundle)
+@@ -592,6 +772,93 @@
+   ScheduleNullMessageEvent (bundle);
+ }
+ 
++uint32_t NullMessageSimulatorImpl::TerminationCheck (PASSIVATOR psvRcv)
++{
++  uint32_t tryStop = false;
++  if ( (m_actType != ACTIVE) && (m_lastActiveTimeLocal <= psvRcv.msgTime) )
++    {
++      if ( psvRcv.msgCounter == m_systemCount )
++        {
++          tryStop = true;
++          for (uint32_t i = 0; i < m_systemCount; ++i)
++            {
++              if (i < m_myId)
++                {
++                  MPI_Isend (&tryStop, 1, MPI_CHAR, i, TERMINATE, MPI_COMM_WORLD,
++                             &m_stopRequests[i]);
++                }
++              else if (i > m_myId)
++                {
++                  MPI_Isend (&tryStop, 1, MPI_CHAR, i, TERMINATE, MPI_COMM_WORLD,
++                             &m_stopRequests[i-1]);
++                }
++            }
++          MPI_Waitall (m_systemCount-1, m_stopRequests, MPI_STATUSES_IGNORE);
++          m_stopSent = true;
++        }
++      else
++        {
++          m_fwdPsv = true;
++          ++psvRcv.msgCounter;
++          MPI_Isend (&psvRcv, sizeof(PASSIVATOR), MPI_CHAR,
++                     (m_myId + 1) % m_systemCount, PASSIVE, MPI_COMM_WORLD, &m_fwdPsvRequest);
++          MPI_Wait (&m_fwdPsvRequest, MPI_STATUS_IGNORE);
++        }
++    }
++  return tryStop;
++}
++
++void NullMessageSimulatorImpl::SendPassiveNotification (void)
++{
++  m_lastActiveTimeLocal = Simulator::Now ().GetTimeStep ();
++  m_actType = PASSIVE;
++
++  PASSIVATOR localPassive;
++  localPassive.msgTime = m_lastActiveTimeLocal;
++  localPassive.msgCounter = 1;
++
++  m_initPsv = true;
++  MPI_Isend (&localPassive, sizeof(PASSIVATOR), MPI_CHAR,
++             (m_myId + 1) % m_systemCount, PASSIVE, MPI_COMM_WORLD, &m_initPsvRequest);
++  MPI_Wait (&m_initPsvRequest, MPI_STATUS_IGNORE);
++}
++
++uint32_t NullMessageSimulatorImpl::GlobalCheckAndStop (void)
++{
++  uint32_t tryStop = false;
++  TERMINATOR* allTerms = reinterpret_cast<TERMINATOR*> (calloc (m_systemCount, 
++                                                                sizeof (TERMINATOR)));
++  TERMINATOR localTerm;
++  localTerm.numRx = MpiInterface::GetRxCount ();
++  localTerm.numTx = MpiInterface::GetTxCount ();
++  localTerm.isFinished = ((int)RemoteChannelBundleManager::Size () <= m_unscheduledEvents);
++  allTerms[m_myId] = localTerm;
++  MPI_Allgather (&localTerm, sizeof (TERMINATOR), MPI_BYTE, allTerms,
++                 sizeof (TERMINATOR), MPI_BYTE, MPI_COMM_WORLD);
++
++  uint32_t totRx = allTerms[0].numRx;
++  uint32_t totTx = allTerms[0].numTx;
++  bool totFinish = allTerms[0].isFinished;
++  for (uint32_t i = 1; i < m_systemCount; ++i)
++    {
++      totRx += allTerms[i].numRx;
++      totTx += allTerms[i].numTx;
++      totFinish &= allTerms[i].isFinished;
++    }
++
++  if ((totRx == totTx) && (totFinish))
++    {
++      tryStop = true;
++      m_stop = true;
++    }
++  else
++    {
++      tryStop = false;
++      m_actType = ACTIVE;
++    }
++  free (allTerms);
++  return tryStop;
++}
+ 
+ NullMessageSimulatorImpl*
+ NullMessageSimulatorImpl::GetInstance (void)
+diff -r 20e19ee60c19 src/mpi/model/null-message-simulator-impl.h
+--- a/src/mpi/model/null-message-simulator-impl.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/null-message-simulator-impl.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -31,12 +31,31 @@
+ #include <iostream>
+ #include <fstream>
+ 
++#ifdef NS3_MPI
++#include "mpi.h"
++#else
++typedef void* MPI_Request;
++#endif
++
+ namespace ns3 {
+ 
+ class NullMessageEvent;
+ class NullMessageMpiInterface;
+ class RemoteChannelBundle;
+ 
++struct PASSIVATOR
++{
++  uint64_t msgTime;
++  uint32_t msgCounter;
++};
++
++struct TERMINATOR
++{
++  uint32_t numRx;
++  uint32_t numTx;
++  bool isFinished;
++};
++
+ /**
+  * \ingroup mpi
+  *
+@@ -78,6 +97,7 @@
+    * Singleton accessor.
+    */
+   static NullMessageSimulatorImpl * GetInstance (void);
++  virtual void SetTime (uint64_t timeValue) { m_currentTs = timeValue; }
+ 
+ private:
+   friend class NullMessageEvent;
+@@ -167,8 +187,35 @@
+    */
+   void NullMessageEventHandler(RemoteChannelBundle* bundle);
+ 
++  /**
++   * \param psvRcv passive structure containing information about the
++   * passive state of a prior LP.
++   *
++   * \return true, if termination detection achieved; false, otherwise
++   *
++   * Updates the last active time and local activity state and notifies
++   * the next LP with this information.
++   */
++  uint32_t TerminationCheck (PASSIVATOR psvRcv);
++
++  /**
++   * Updates the last active time and local activity state and notifies
++   * the next LP with this information.
++   */
++  void SendPassiveNotification (void);
++
++  /**
++   * \return Success or failure of the global check
++   *
++   * Performs an AllGather check across all LPs to confirm that
++   * termination has been appropriately detected.
++   */
++  uint32_t GlobalCheckAndStop (void);
++
+   typedef std::list<EventId> DestroyEvents;
+ 
++  uint32_t		m_numMessages;
++
+   DestroyEvents m_destroyEvents;
+   bool m_stop;
+   Ptr<Scheduler> m_events;
+@@ -189,6 +236,17 @@
+    */
+   Time m_safeTime;
+ 
++  bool m_stopScheduled;
++  uint32_t m_actType;
++  uint64_t m_lastActiveTimeLocal;
++  uint64_t m_lastActiveTimeRemote;
++  uint32_t m_initPsv;
++  uint32_t m_fwdPsv;
++  uint32_t m_stopSent;
++  MPI_Request m_initPsvRequest;
++  MPI_Request m_fwdPsvRequest;
++  MPI_Request* m_stopRequests;
++
+   /*
+    * Null Message performance tuning parameter.  Controls when Null
+    * messages are sent.  When value is 1 the minimum number of Null
+@@ -201,6 +259,8 @@
+    */
+   double m_schedulerTune;
+ 
++  uint32_t m_numGroups;
++
+   /*
+    * Singleton instance.
+    */
+diff -r 20e19ee60c19 src/mpi/model/parallel-communication-interface.h
+--- a/src/mpi/model/parallel-communication-interface.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/parallel-communication-interface.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -90,6 +90,14 @@
+    * Serialize and send a packet to the specified node and net device
+    */
+   virtual void SendPacket (Ptr<Packet> p, const Time &rxTime, uint32_t node, uint32_t dev) = 0;
++  virtual void SendLocal (Ptr<Packet> p, const Time &rxTime) = 0;
++
++  virtual uint32_t GetRxCount () = 0;
++  virtual uint32_t GetTxCount () = 0;
++  virtual void RegRx () = 0;
++  virtual void RegTx () = 0;
++  virtual void SetDelay (Time delay) = 0;
++  virtual Time GetDelay() = 0;
+ 
+ private:
+ };
+diff -r 20e19ee60c19 src/mpi/model/remote-channel-bundle-manager.h
+--- a/src/mpi/model/remote-channel-bundle-manager.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/remote-channel-bundle-manager.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -74,6 +74,18 @@
+    */
+   static void Destroy (void);
+ 
++  typedef std::map<uint32_t, Ptr<RemoteChannelBundle> > RemoteChannelMap;
++
++  static RemoteChannelMap::iterator Begin (void)
++    {
++      return g_remoteChannelBundles.begin ();
++    }
++
++  static RemoteChannelMap::iterator End (void)
++    {
++      return g_remoteChannelBundles.end ();
++    }
++
+ private:
+ 
+   /**
+@@ -92,7 +104,6 @@
+    *
+    * Would be more efficient to use unordered_map when C++11 is adopted for NS3.
+    */
+-  typedef std::map<uint32_t, Ptr<RemoteChannelBundle> > RemoteChannelMap;
+   static RemoteChannelMap g_remoteChannelBundles;
+ 
+   /*
+diff -r 20e19ee60c19 src/mpi/model/remote-channel-bundle.cc
+--- a/src/mpi/model/remote-channel-bundle.cc	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/remote-channel-bundle.cc	Wed Feb 11 09:52:18 2015 -0500
+@@ -30,6 +30,8 @@
+ 
+ #define NS_TIME_INFINITY ns3::Time (0x7fffffffffffffffLL)
+ 
++Time RemoteChannelBundle::m_delay = NS_TIME_INFINITY;
++
+ TypeId RemoteChannelBundle::GetTypeId (void)
+ {
+   static TypeId tid = TypeId ("ns3::RemoteChannelBundle")
+@@ -40,15 +42,15 @@
+ 
+ RemoteChannelBundle::RemoteChannelBundle ()
+   : m_remoteSystemId (-1),
+-    m_guaranteeTime (0),
+-    m_delay (NS_TIME_INFINITY)
++    m_guaranteeTime (0)//,
++    //m_delay (NS_TIME_INFINITY)
+ {
+ }
+ 
+ RemoteChannelBundle::RemoteChannelBundle (const uint32_t remoteSystemId)
+   : m_remoteSystemId (remoteSystemId),
+-    m_guaranteeTime (0),
+-    m_delay (NS_TIME_INFINITY)
++    m_guaranteeTime (0)//,
++    //m_delay (NS_TIME_INFINITY)
+ {
+ }
+ 
+diff -r 20e19ee60c19 src/mpi/model/remote-channel-bundle.h
+--- a/src/mpi/model/remote-channel-bundle.h	Fri Dec 12 08:58:30 2014 -0800
++++ b/src/mpi/model/remote-channel-bundle.h	Wed Feb 11 09:52:18 2015 -0500
+@@ -114,6 +114,9 @@
+    */
+   friend std::ostream& operator<< (std::ostream& out, ns3::RemoteChannelBundle& bundle );
+ 
++  static void SetDelay (Time delay) { m_delay = delay; }
++  static Time GetDelayStatic (void) { return m_delay; }
++
+ private:
+   /*
+    * Remote rank.
+@@ -137,7 +140,7 @@
+   /*
+    * Delay for this Channel bundle.   min link delay over all incoming channels;
+    */
+-  Time m_delay;
++  static Time m_delay;
+ 
+   /*
+    * Event scheduled to send Null Message for this bundle.
